@@ -9,10 +9,10 @@ use Test\Prometheus\AbstractCounterTest;
 
 /**
  * See https://prometheus.io/docs/instrumenting/exposition_formats/
+ * @requires extension apc
  */
 class CounterTest extends AbstractCounterTest
 {
-
     public function configureAdapter()
     {
         if (function_exists('apcu_fetch')) {

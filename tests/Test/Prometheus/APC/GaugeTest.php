@@ -9,10 +9,10 @@ use Test\Prometheus\AbstractGaugeTest;
 
 /**
  * See https://prometheus.io/docs/instrumenting/exposition_formats/
+ * @requires extension apc
  */
 class GaugeTest extends AbstractGaugeTest
 {
-
     public function configureAdapter()
     {
         if(function_exists('apcu_fetch'))

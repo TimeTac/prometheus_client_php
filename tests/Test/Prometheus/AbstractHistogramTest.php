@@ -6,6 +6,7 @@ namespace Test\Prometheus;
 use PHPUnit_Framework_TestCase;
 use Prometheus\Histogram;
 use Prometheus\MetricFamilySamples;
+use Prometheus\Sample;
 use Prometheus\Storage\Adapter;
 
 
@@ -374,6 +375,7 @@ abstract class AbstractHistogramTest extends PHPUnit_Framework_TestCase
     /**
      * @test
      * @expectedException \InvalidArgumentException
+     * @expectedExceptionMessage Histogram buckets must be in increasing order
      */
     public function itShouldThrowAnExceptionWhenTheBucketSizesAreNotIncreasing()
     {
@@ -383,6 +385,7 @@ abstract class AbstractHistogramTest extends PHPUnit_Framework_TestCase
     /**
      * @test
      * @expectedException \InvalidArgumentException
+     * @expectedExceptionMessage Histogram must have at least one bucket
      */
     public function itShouldThrowAnExceptionWhenThereIsLessThanOneBucket()
     {
@@ -392,15 +395,17 @@ abstract class AbstractHistogramTest extends PHPUnit_Framework_TestCase
     /**
      * @test
      * @expectedException \InvalidArgumentException
+     * @expectedExceptionMessage Histogram cannot have a label named
      */
     public function itShouldThrowAnExceptionWhenThereIsALabelNamedLe()
     {
-        new Histogram($this->adapter, 'test', 'some_metric', 'this is for testing', array('le'), array());
+        new Histogram($this->adapter, 'test', 'some_metric', 'this is for testing', array('le'), array(1));
     }
 
     /**
      * @test
      * @expectedException \InvalidArgumentException
+     * @expectedExceptionMessage Invalid metric name
      */
     public function itShouldRejectInvalidMetricsNames()
     {
@@ -410,10 +415,56 @@ abstract class AbstractHistogramTest extends PHPUnit_Framework_TestCase
     /**
      * @test
      * @expectedException \InvalidArgumentException
+     * @expectedExceptionMessage Invalid label name
      */
     public function itShouldRejectInvalidLabelNames()
     {
         new Histogram($this->adapter, 'test', 'some_metric', 'help', array('invalid label'), array(1));
+    }
+
+    /**
+     * @test
+     * @dataProvider labelValuesDataProvider
+     *
+     * @param mixed $value The label value
+     */
+    public function isShouldAcceptAnySequenceOfBasicLatinCharactersForLabelValues($value)
+    {
+        $label = 'foo';
+        $histogram = new Histogram($this->adapter, 'test', 'some_metric', 'help', array($label), array(1));
+        $histogram->observe(1, array($value));
+
+        $metrics = $this->adapter->collect();
+        self::assertInternalType('array', $metrics);
+        self::assertCount(1, $metrics);
+        self::assertContainsOnlyInstancesOf(MetricFamilySamples::class, $metrics);
+
+        $metric = reset($metrics);
+        $samples = $metric->getSamples();
+        self::assertContainsOnlyInstancesOf(Sample::class, $samples);
+
+        foreach ($samples as $sample) {
+            $labels = array_combine(
+                array_merge($metric->getLabelNames(), $sample->getLabelNames()),
+                $sample->getLabelValues()
+            );
+            self::assertEquals($value, $labels[$label]);
+        }
+    }
+
+    /**
+     * @see isShouldAcceptArbitraryLabelValues
+     * @return array
+     */
+    public function labelValuesDataProvider()
+    {
+        $cases = [];
+        // Basic Latin
+        // See https://en.wikipedia.org/wiki/List_of_Unicode_characters#Basic_Latin
+        for ($i = 32; $i <= 121; $i++) {
+            $cases['ASCII code ' . $i] = array(chr($i));
+        }
+        return $cases;
     }
 
     public abstract function configureAdapter();
